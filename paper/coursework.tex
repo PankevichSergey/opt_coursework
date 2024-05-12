@@ -1,0 +1,577 @@
+\documentclass[a4paper,12pt]{extarticle}
+\usepackage{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{colortbl}
+\usepackage{tikz}
+\usepackage{pgf}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage{algorithm}
+
+\newcommand{\argmin}{\mathop{\rm argmin}}
+\usepackage{algorithmic}
+\usepackage[
+backend=biber,
+style=numeric,
+maxbibnames=99
+]{biblatex}
+\addbibresource{refs.bib}
+\usepackage[colorlinks,citecolor=blue,linkcolor=blue,bookmarks=false,hypertexnames=true, urlcolor=blue]{hyperref} 
+\usepackage{indentfirst}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage[flushleft]{threeparttable}
+\usepackage{tablefootnote}
+
+\usepackage{chngcntr} % нумерация графиков и таблиц по секциям
+\counterwithin{table}{section}
+\counterwithin{figure}{section}
+
+\graphicspath{{graphics/}}%путь к рисункам
+
+\makeatletter
+% \renewcommand{\@biblabel}[1]{#1.} % Заменяем библиографию с квадратных скобок на точку:
+\makeatother
+
+\geometry{left=2.5cm}% левое поле
+\geometry{right=1.0cm}% правое поле
+\geometry{top=2.0cm}% верхнее поле
+\geometry{bottom=2.0cm}% нижнее поле
+\setlength{\parindent}{1.25cm}
+\renewcommand{\baselinestretch}{1.5} % междустрочный интервал
+
+\newcommand{\eqdef}{\coloneqq}
+\def\<#1,#2>{\langle #1,#2\rangle}
+\newcommand{\norm}[1]{\|#1\|}
+\newcommand{\sqn}[1]{\norm{#1}^2}
+\newcommand{\bibref}[3]{\hyperlink{#1}{#2 (#3)}} % biblabel, authors, year
+\addto\captionsrussian{\def\refname{Список литературы (или источников)}} 
+
+\renewcommand{\theenumi}{\arabic{enumi}}% Меняем везде перечисления на цифра.цифра
+\renewcommand{\labelenumi}{\arabic{enumi}}% Меняем везде перечисления на цифра.цифра
+\renewcommand{\theenumii}{.\arabic{enumii}}% Меняем везде перечисления на цифра.цифра
+\renewcommand{\labelenumii}{\arabic{enumi}.\arabic{enumii}.}% Меняем везде перечисления на цифра.цифра
+\renewcommand{\theenumiii}{.\arabic{enumiii}}% Меняем везде перечисления на цифра.цифра
+\renewcommand{\labelenumiii}{\arabic{enumi}.\arabic{enumii}.\arabic{enumiii}.}% Меняем везде перечисления на цифра.цифра
+
+\begin{document}
+\input{title_kr}% это титульный лист - выберите подходящий вам из имеющихся в проекте вариантов (kr - курсовая работа у 3 курса, vkr - выпускная квалификационная работа у 4 курса)
+\newpage
+\setcounter{page}{2}
+
+{   
+
+	\hypersetup{linkcolor=black}
+	\tableofcontents
+}
+
+\newpage
+
+\newpage
+\section*{Аннотация}   % this is how to use russian
+
+\addcontentsline{toc}{section}{Аннотация}
+Алгоритмы распределенной оптимизации становятся все более актуальными,
+так как современные модели машинного обучения зачастую тренируются на массивах данных,
+которые невозможно разместить на одном вычислительном устройстве в силу их большого размера или приватности.
+В данной работе рассматривается случай централизованной оптимизации, где один сервер хранит параметры модели,
+данные разделены между несколькими устройствами и сервером, управляющим процессом оптимизации.
+Целью работы является обобщение оценок полученных в случае сильно выпуклых функций на более широкий класс функций
+в условиях схожести слагаемых. 
+\section*{Ключевые слова}
+Методы оптимизации, распределенная оптимизация, централизованная оптимизация, условие Поляка-Лоясиевича, схожесть слагаемых
+\pagebreak
+
+
+% chktex-file 8
+% chktex-file 3
+% chktex-file 25
+
+\section{Введение}
+
+\subsection{Описание предметной области}
+\newcommand{\zij}{z_{i}^{(j)}}
+\newcommand{\lxz}{l (x, \zij)}
+\newcommand{\fj}{\sum_{i=1}^{n} \lxz}
+\newcommand{\R}{\mathbb{R}}
+
+Распределенная оптимизация возникает в случае, когда функционал зависит от данных, размещенных на различных носителях.
+Например, в случае поиска параметров некой модели машинного обучения оптимизируется эмпирическая функция потерь.
+В централизованном случае распределенной оптимизации данные распределены между сервером и другими компьютерами.
+Происходит итерационный процесс в ходе которого сервер поручает другим компьютерам выполнять некоторые вычисления,
+они направляют результаты обратно серверу и сервер выполняет шаги оптимизационного процесса, используя данные,
+размещенные на нем и полученные значения от других компьютеров
+
+
+\subsection{Постановка задачи}
+В данной работе работе рассматривается централизованная оптимизация в случае, когда слагаемые,
+из которых состоит оптимизируемый функционал, в какой-то мере схожи между собой.
+Целью работы является доказательство оценки на сходимость уже известных алгоритмов в терминах условия Поляка-Лоясиевича
+и исследование возможностей улучшения алгоритмов с учетом ограничений на функционал. 
+
+
+\section{Формальная постановка задачи}
+
+Скажем, что всего есть $m$ компьютеров и $n$ элементов обучающей выборки на каждом, $N = nm$ -- суммарное количество примеров.
+Обозначим за $z_i^{(j)}$ -- элемент обучающей выборки под номером $i$ на машине номер $j$. Будем обозначать за $x\in\R^d$ параметры.
+Обозначим за  $l(x, z)$ -- функцию потерь на элементе $z$, при векторе параметров $x$. Кроме того введем следуюшие обозначения:
+
+\begin{equation}
+    \label{eq:f_i}
+         f_i(x) = \frac{1}{n} \sum_{j=1}^{n} l(x, z_i^j)
+\end{equation}
+
+\begin{equation}
+    \label{eq:F}
+         F(x) = \frac{1}{m} \sum_{i=1}^{m} f_i(x)
+\end{equation}
+
+То есть $F(x)$ представляет из себя эмпирический риск на всем массиве данных, а $f_i$ -- на компьютере $i$.
+Тогда нашей целью будет являться решение следующей задачи оптимизации
+\begin{equation}
+    \label{eq:opt_x}
+         \min_{x\in\R^d}~~ F(x)+\psi(x)
+\end{equation}
+
+
+Где $\psi(x)$ представляет из себя некоторую функцию регуляризации. Для начала положим $\psi(x) = 0$. 
+
+
+
+\section{Обзор литературы}
+\subsection{Условие сильной выпуклости}
+
+Функция $f:\R^d\to\R$ называется сильно выпуклой на множестве $S$, если существует такая положительная константа $\mu$, что 
+\begin{equation}\label{eqn:strong_convex}   
+    \mu I \preceq \nabla^2 f(x), \quad \forall\, x\in S
+\end{equation}
+
+Это условие часто выполняется для изучаемых нами просто выпуклых функций из-за добавления $L_2$ регуляризации.
+В статье (Hendrikx et al., 2020)\cite{Hendrikx-paper} с его учетом дается оценка скорости сходимости,
+которую мы приведем после описания еще одного важного условия. 
+
+\subsection{Условие схожести слагаемых}
+ Скажем, что функции $f(x)$ и $g(x)$ являются $\delta$-cхожими на некотором множестве $S$, если выполнено следующее. 
+ \begin{equation}\label{eqn:Hessian-approx-mu}
+    \left\|\nabla^2 f(x) - \nabla^2 g(x)\right\| \leq \delta, 
+    \quad \forall\, x\in S,
+\end{equation}
+Рассматриваемая нами функция $F$ имеет вид суммы нескольких слагаемых.
+Заметим, что если данные на каждом компьютере получены случайным выбором без возвращения $n$ элементов из обучающей выборки,
+то $f_i$ весьма вероятно похожи между собой и хорошо приближают функцию $F$.
+А именно, в (Troop J., 2015)\cite{Troop-paper} с помощью матричного неравенства Хеффдинга показано,
+что с вероятностью не меньше $1-p$ выполнено:
+
+\begin{equation}\label{eqn:matrix-hoeffding}
+    \biggl\|\nabla^2f_i(x)\!-\!\nabla^2 F(x)\biggr\|
+    \!\leq\! \sqrt{\frac{32 A_l^2 \log(d/p)}{n}},
+\end{equation}
+Для некоторого числа $A_l$ такого, что $A_l \geq \|\nabla^2\ell(x,z_i)\| \ \forall\, x\in S$.
+
+
+Использовать $\delta$-cхожесть для уменьшения числа итераций алгоритма в случае сильно выпуклых функций можно,
+если воспользоваться зеркальным спуском c дивергенцией Брэгмана $D_{\phi}(x, x_t)$, определяемой следующим образом
+
+
+\begin{equation}\label{eqn:Bregman-def}
+    D_\phi(x, y) \triangleq \phi(x) - \phi(y) - \nabla \phi(y)^\top(x - y).
+\end{equation}
+
+
+Скажем, что сервер имеет номер 1 среди всех машин, тогда введем следующую $\phi(x)$
+\begin{equation}\label{eqn:reference-def}
+    \phi(x) = f_1(x) + \frac{\delta}{2}|x\|^2.
+\end{equation}
+
+
+
+Теперь можно модифицировать предыдущий алгоритм.
+
+\begin{algorithm}[]
+\caption{Зеркальный спуск в условиях схожести слагаемых}
+\begin{algorithmic}[1]
+
+\STATE{} receive $(\eta, x_1, K)$ as input 
+\vspace{0.5ex}
+\FOR{$t=1,2\ldots, K$} 
+\vspace{0.5ex}
+\STATE{} send $x_t$ to all computers 
+\vspace{0.5ex}
+\vspace{0.5ex}
+\FOR{$i=1,2\ldots, m$} 
+\vspace{0.5ex}
+\STATE{} receive $x_t$
+\vspace{0.5ex}
+\STATE{} compute $\nabla f_i(x_t)$
+\vspace{0.5ex}
+\STATE{} send $\nabla f_i(x_t)$
+\vspace{0.5ex}
+\ENDFOR{}
+\vspace{0.5ex}
+\STATE{} receive $\nabla f_1(x_t), \nabla f_2(x_t), \ldots, \nabla f_m(x_t)$
+\vspace{0.5ex}
+
+\STATE{} compute $\nabla F(x_k)= \frac{1}{m} \sum_{i = 1}^{m}  \nabla f_i(x_t)$\
+\vspace{0.5ex}
+
+\STATE{} $x_{t+1} = \argmin_{x\in \R^d} \Bigl\{\nabla F(x_t){}^\top\! x + \frac{1}{\eta} D_\phi(x,x_{t}) \Bigr\}$.
+\vspace{0.5ex}
+
+\ENDFOR{}
+\RETURN{} $x_{K}$
+\end{algorithmic}
+\end{algorithm}
+
+
+
+Для него выполняется оценка (Hendrikx et al., 2020)\cite{Hendrikx-paper}:
+\begin{equation} \label{eqn:mirror_convergence}
+    D_\phi(x*, x_{k+1}) \leq \left (1 - \frac{\mu}{\mu + 2\delta} \right ) ^k D_\phi(x*, x_1)
+\end{equation}
+
+Где $x^* = \argmin F(x)$.
+
+
+\section{Формальная постановка задачи}
+    \[ r = \sum_{i=1}^n f_i \]
+    \[ r = p + q \]
+    \[q = f_1 \] 
+    \[p = \frac1n \sum \left[ f_i - f_1\right] \]
+\section{Методы решения задачи}
+\subsection{Примитивы}
+Для начала определим два примитива, которыми будут пользоваться последующие алгоритмы
+
+    \begin{algorithm}[]
+    \caption{Подсчет $\nabla r(x)$}
+    \begin{algorithmic}[1]
+    
+    \STATE{} \textbf{Input}: $x \in \mathbb{R}^d$
+    \STATE{} send $x$ to all computers 
+    \vspace{0.5ex}
+    \vspace{0.5ex}
+    \FOR{$i=1,2\ldots, n$} 
+    \vspace{0.5ex}
+    \STATE{} receive $x$
+    \vspace{0.5ex}
+    \STATE{} compute $\nabla f_i(x)$
+    \vspace{0.5ex}
+    \STATE{} send $\nabla f_i(x)$
+    \vspace{0.5ex}
+    \ENDFOR{}
+    \vspace{0.5ex}
+    \STATE{} receive $\nabla f_1(x_t), \nabla f_2(x_t), \ldots, \nabla f_n(x_t)$
+    \vspace{0.5ex}
+    
+    \STATE{} compute $\nabla r(x)= \frac{1}{n} \sum_{i = 1}^{n}  \nabla f_i(x_t)$\
+    \RETURN{} $\nabla r(x)$
+    \end{algorithmic}
+    \end{algorithm}
+    Приведем подробное описание принципа работы,
+    в дальнейшем в аналогичном контексте используется такая же схема
+    взаимодействия сервера и других компьютеров
+
+    Сервер получает на вход значение $x$. В строчке 2 он отсылает его всем компьютерам. 
+    После чего все компьютеры параллельно исполняют строчки 4, 5 и 6.
+    В строчке 8 сервер получает резульаты вычислений всех компьютеров. 
+    В конце он вычисляет $\nabla r(x)$, используя полученные результаты, и возвращает результат. 
+
+
+    Данное действие требует 1 раунд коммуникаций и $n$ локальных вызовов оракула градиента. 
+
+
+    \begin{algorithm}[]
+    \caption{Подсчет $\nabla q(x)$}
+    \begin{algorithmic}[1]
+    
+  
+    \STATE{} send $x$ to all computers 
+    \vspace{0.5ex}
+    \vspace{0.5ex}
+    \FOR{$i=2,3\ldots, n$} 
+    \vspace{0.5ex}
+    \STATE{} receive $x$
+    \vspace{0.5ex}
+    \STATE{} compute $\nabla f_i(x)$
+    \vspace{0.5ex}
+    \STATE{} send $\nabla f_i(x)$
+    \vspace{0.5ex}
+    \ENDFOR{}
+    \vspace{0.5ex}
+    \STATE{} receive $\nabla f_2(x_t), \nabla f_2(x_t), \ldots, \nabla f_n(x_t)$
+    \STATE{} compute $\nabla f_1(x)$
+    \STATE{} compute $\nabla q(x) = \frac1n \sum_{i = 1}^{n} \left[\nabla f_i(x)  - \nabla f_1(x) \right]$
+    \vspace{0.5ex}
+    \RETURN{} $\nabla q(x)$
+    \end{algorithmic}
+    \end{algorithm}
+
+    Этот алгоритм использует схему вычислений, аналогичную предыдущей,
+    и также требует 1 раунд коммуникаций и $n$ локальных вызовов оракула градиента. 
+
+
+
+\subsection{Централизованная версия градиентного спуска}
+
+Приведем пример работы градиентного спуска в условиях централизованной оптимизации.
+
+\begin{algorithm}[]
+    \caption{Централизованный градиентный спуск}
+    \begin{algorithmic}[1]
+
+    \STATE{} \textbf{Input}: $x^0 \in \mathbb{R}^d$
+    \STATE{} \textbf{Parameters}: $\eta, K$
+    \vspace{0.5ex}
+    \FOR{$t=0,1\ldots, K - 1$} 
+    \vspace{0.5ex}
+    \STATE{} $x_{t + 1} = x_t - \eta \nabla r(x_t)$
+    \vspace{0.5ex}
+    \ENDFOR{}
+    \RETURN{} $x_{K}$
+    \end{algorithmic}
+\end{algorithm}
+
+Где $\eta = \frac{1}{L}$
+
+\subsection{Централизованная версия ускоренного градиентного спуска}
+
+\begin{algorithm}[]
+    \caption{Централизованный ускоренный градиентный спуск}
+    \begin{algorithmic}[1]
+
+    \STATE{} \textbf{Input}: $x^0 \in \mathbb{R}^d$
+    \STATE{} \textbf{Parameters}: $\eta, \kappa, \mu, L, \gamma$
+    \STATE{} $y_0 = x_0$
+    \vspace{0.5ex}
+    \FOR{$t=0,1\ldots, K - 1$} 
+    \vspace{0.5ex}
+    \STATE{} $y_{t + 1} = x_{t} - \eta \nabla r(x_t)$
+    \STATE{} $x_{t + 1} = (1 + \gamma)y_{t+1} - \gamma y_{t}$
+    \vspace{0.5ex}
+    \ENDFOR{}
+    \RETURN{} $x_{K}$
+    \end{algorithmic}
+\end{algorithm}
+
+Где $\eta = \frac{1}{\eta}$, $\kappa = \frac{L}{\mu}$, $\gamma = \frac{\sqrt{\kappa} - 1}{\sqrt{\kappa} + 1}$
+
+Данные алгоритмы эквивалентны градиентному и ускоренному градиентному спуску в
+классическом нераспределенном случае по производимым вычислениям.
+Мы будем их использовать в качестве базовых решений для сравнения эффективности по числу коммуникаций и
+числу вызовов оракула градиента $f_i$.
+
+
+\subsection{Accelerated Extragradient}
+
+В статье [???] приведен алгоритм,
+который является асимптотически оптимальным как по числу локальных вызовов оракула градиента,
+так и по числу коммуникаций. 
+
+
+\begin{algorithm}[]
+    \caption{Accelerated Extragradient}
+    \begin{algorithmic}[1]
+
+    \STATE{} \textbf{Input}: $x^0 \in \mathbb{R}^d$
+    \STATE{} \textbf{Parameters}: $K, \eta, \theta, \alpha$
+    \STATE{} $x_f^0 = x^0$
+    \FOR{$t=0,1\ldots, K - 1$} 
+    \STATE{} $x_g^k = \tau x^k + (1-\tau)x^k_f$
+    \STATE{} $x_f^{k+1} \approx \argmin_{x \in \R^d}\left[ A_\theta^k(x) \eqdef p(x_g^k) + \<\nabla p(x_g^k),x - x_g^k> + \frac{1}{2\theta}\sqn{x - x_g^k} + q(x)\right]$
+    \STATE{} $x^{t+1} = x^t + \eta\alpha (x_f^{t+1}  - x^t)- \eta \nabla r(x_f^{t+1})$
+    \ENDFOR{}
+    \RETURN{} $x^{K}$
+    \end{algorithmic}
+\end{algorithm}
+
+В данном случае в строчке 6 имеется в виду приближенное решение задачи, для которого соблюдается условие 
+\[	\sqn{\nabla A_\theta^k(x_f^{k+1})} \leq  \frac{L_p^2}{3}\sqn{x_g^k- \argmin_{x \in \R^d} A_\theta^k(x)}\]
+
+\subsubsection{Алгоритм решения}
+
+\subsection{Modified Accelerated Extragradient}
+Заметим, что условие [???] непрактично, так как невозможно применять итерационный метод 
+для поиска решения и прекращать итерации, как только оно стало выполнено. Это из-за того 
+что в выражении справа необходимо знать $\argmin_{x \in \R^d} A_\theta^k(x)$. Поэтому 
+в представленном в статье [???] алгоритме необходимо делать фиксированное число итераций 
+оптмизационного процесса такое, что условие [] гарантированно выполнено. 
+
+В нашем методе будем искать решение такое, что выполняется другое условие:
+\[	\sqn{\nabla A_\theta^k(x_f^{k+1})} \leq  L_p^2 \sqn{x_g^k- x_f^{k+1}} \]
+Искать эту точку будем, минимизируя $A_{\theta}^k$, с использованием ускоренного градиентного спуска,
+начиная из точки $x_g$.
+
+
+
+\begin{algorithm}[]
+    \caption{Subproblem solver 2}
+    \begin{algorithmic}[1]
+
+    \STATE{} \textbf{Input}: $x_g \in \mathbb{R}^d$
+    \STATE{} \textbf{Parameters}: $\eta, \kappa, \mu, L, \gamma$
+    \STATE{} $y_0 = x_0$
+    \vspace{0.5ex}
+    \FOR{$t=0,1\ldots, K - 1$} 
+    \vspace{0.5ex}
+    \STATE{} $y_{t + 1} = x_{t} - \eta \nabla r(x_t)$
+    \STATE{} $x_{t + 1} = (1 + \gamma)y_{t+1} - \gamma y_{t}$
+    \vspace{0.5ex}
+    \ENDFOR{}
+    \RETURN{} $x_{K}$
+    \end{algorithmic}
+\end{algorithm}
+
+
+
+
+\subsection{}
+
+    В качестве начального решения будем использовать централизованную верси
+\section{Теоретический анализ}
+    \subsection{Оценка на количество итераций для решения подзадачи}
+
+\section{Условие схожести слагаемых }
+    оценить Lq через дельту
+    $\delta = O (1/\sqrt{m})$
+
+\section{Экспериментальное исследование метода}
+    Будем рассматривать следующую задачу минимизации эмпирического риска (Ridge-регрессию)
+    \[ F(w) = \frac{\lambda}{2} ||w||_2^2 + \frac{1}{2N} \sum_{i=1}^n (w^t x_i - y_i)^2 \to_{w} \min \]
+     Где $x_i$ -- вектор параметров объекта $i$, $w$ -- параметры модели, $ \lambda $ -- коэффициент регуляризации.
+    Эквивалентно ее можно переписать в матричном виде следующим образом: 
+        \[\frac{1}{2N}||Xw - y||_2^2 + \frac{\lambda}{2} ||w||_2^2 \to_{w} \min \]
+    Где $X$ -- матрица высоты $N$ и ширины $d$, в строке $i$ которой находится $x_i^t$.
+    Будем ее называть матрицей дизайна. 
+   
+    Будем делать два типа экспериментов: на синтетических данных и реальных.
+    В обоих случаях распределенность будет симулироваться.
+    Мы будем производить все вычисления на одном устройстве, но при соверешении действий,
+    эквивалентных коммуникации сервера и компьютеров, будем инкрементировать счетчик числа коммуникаций.
+    Аналогично при подсчете градиента функции, относящихся к слагаемым на одной из машин,
+    будем инкрементировать счетчик числа локальных вызовов. 
+
+    \subsection{Эксперимент на синтетических данных}
+    Будем рассматривать сеть из $n$ машин, первая из которых является сервером.
+    На каждой машине будут располагаться $m$ примеров.
+        
+    \begin{itemize}
+    \item  Сгенерируем матрицу дизайна для сервера $X_1$,
+    где $X_{1ij} \sim^{i.i.d} \mathcal{N}(0, L)$ c использованием  \textbf{numpy}.
+    Константа L позволяет регулировать константу липшица градиента функции потерь по параметрам.
+    Чем больше L, тем в среднем выше константа липшицевости. 
+    
+    \item После чего сгенерируем вектор $w$, $ w_i \sim^{i.i.d} \mathcal{N}(0, 1)$. 
+    
+    \item Теперь положим $y = X_1w + \varepsilon$, где $\varepsilon_i \sim^{i.i.d} \mathcal{N}(0, 1)$
+    \newcommand\tab[1][1cm]{\hspace*{#1}}
+    
+
+    \tab{} Это соответствует классическим статистическим предположениям в задаче линейной регрессии. 
+
+    \item Сгенерируем матрицы дизайна других машин ($k \geq 2$) следующим образом $X_k = X_1 + \delta P_k$,
+     где $P_{kij} \sim^{i.i.d} \mathcal{N}(0, 1)$.
+    Константа $\delta$ позволяет регулировать схожесть данных на сервере и других машинах.
+    Чем она меньше, тем в среднем ближе будут гессианы функций на разных машинах. 
+    
+    \end{itemize}
+
+    Частично для приближения к условиям статьи [] были выбраны следующие константы 
+    \begin{itemize}
+        \item $\lambda = 0.1$
+        \item $n = 25$
+        \item $m = 100$
+        \item $d = 50$
+        \item $\delta = 0.1$
+        \item $L = 2$
+    \end{itemize}
+
+    \subsection{Эксперимент на реальных данных}
+    В качестве реальных данных для эксперимента использовался
+    \href{https://www.kaggle.com/datasets/budincsevity/szeged-weather/data}{набор данных},
+    в котором собрана информация о погоде. 
+ 
+    В качестве признаков выбирались столбцы 
+    \begin{itemize}
+        \item ``Wind Speed (km/h)'
+        \item ``Humidity'
+        \item ``Wind Bearing (degrees)'
+        \item ``Visibility (km)'
+        \item ``Loud Cover'
+        \item ``Pressure (millibars)'
+        \item ``Temperature (C)'
+    \end{itemize}
+    В качестве предсказываемой величины ``Apparent Temperature (C)'.
+
+    
+    Кроме того к признакам добавлен единичный свободный член.
+    Признаки отнормированы так, что имеют нулевое среднее и единичную выборочную дисперсию.
+    Объекты распределены между 25 машинами в случайном порядке. 
+
+    
+    \subsection{Оценка констант $\delta$, $L_p$, $L_q$, $\mu$}
+
+    Для работы некоторых методов необходимо знание констант гладкости и сильной выпуклости.
+    Кроме того их знание полезно для отслеживания зависимостей качества различных методов от свойств данных. 
+     \[ f_i(w) = \frac{1}{m}||X_i w - y||_2^2 + \frac{\lambda}{2} ||w||_2^2\]
+    \[ \nabla_{w} f_i = \frac{1}{m}X_i^T(X_i w - y) + \lambda w\]
+    \[\nabla_{w}^2 f_i  = \frac{1}{m}X_i^T X_i + \lambda I_d\]
+
+    \subsubsection{Оценка $L_q$}
+   
+    \[q(w) = f_1(w) \]
+    \[\nabla_{w}^2 q =  \frac{1}{m}X_i^T X_i + \lambda I_d\]
+    \[L_q =  \frac{1}{m} \lambda_{\max}(X_i^T X_i ) + \lambda\]
+
+    \subsubsection{Оценка $L_p$}
+    \[p(w) = \frac{1}{n} \sum_{i=1}^{n} \left[f_i(w) - f_1(w)\right]\]
+    \[\nabla_{w}^2p = \frac{1}{n}\sum_{i = 1}^{n} [\nabla_{w}^2f_i - \nabla_{w}^2f_1] = \]
+    \[ = \frac{1}{n}\sum_{i = 1}^{n} [\frac{1}{m}X_i^T X_i + \lambda I_d - \frac{1}{m}X_1^T X_1- \lambda I_d] = \] 
+    
+    \[=\frac{1}{n}\sum_{i = 1}^{n} [\frac{1}{m}X_i^T X_i]- \frac{1}{m} X_1^T X_1 = \]
+
+    \[L_p = \lambda_{\max}(\frac{1}{n}\sum_{i = 1}^{n} [\frac{1}{m}X_i^T X_i]- \frac{1}{m} X_1^T X_1) \]
+
+    Где $\lambda_{\max}$ -- наибольшее собственное значение матрицы,
+    которое можно найти с помощью функции \textbf{eigvalsh} из пакета \textbf{scipy},
+    которая подходит для работы с симметричными вещественными матрицами. 
+     
+
+    
+    \subsubsection{Оценка $\delta$}
+    Отметим, что в нашем случае у всех функций гессиан является константным, поэтому 
+    \[\delta = \max_{i} ||\nabla_{w}^2 f_1 - \nabla_{w}^2 f_i||_2 = \frac{1}{m} \max_{i} ||X_1^T X_1 - X_i^T X_i||\]
+    
+    \subsubsection{Оценка $\mu$}
+    Каждая функция $\frac{1}{m}||X_iw - y||_2^2$ является выпуклой,
+    $\frac{\lambda}{2} ||w||_2^2$ является $\lambda$-сильно выпуклой,
+    поэтому  каждая функция $f_i$ и $r = \sum\frac{1}{n} f_i$ являются $\mu$-сильно выпуклой,
+    где $\mu = \lambda$.
+
+    \subsection{Оценка сходимости методов}
+    Для оценки сходимости каждого метода на итерации $T$ будем вычислять во сколько раз квадрат расстояния до оптимума меньше,
+    то есть 
+    \[\frac{||w^T - w_*||_2^2}{||w^0 - w_*||},\]
+    где 
+    \[w_* = \argmin \frac{1}{2N}||Xw - y||_2^2 + \frac{\lambda}{2}||w||_2^2\]
+    Во всех методах будем полагать $w_0 = 0$.
+    Для задачи (todo) сущетсвует точное аналитическое решение:
+    \[w_* = (X^T X + N\lambda I_d)^{-1}X^T y,\]
+    которое мы будем использовать в экспериментах. 
+    
+    Отметим, что зачастую аналитическое решение непрактично из-за высокой временной сложности
+    обращения матриц и вычислительной неустойчивости, поэтому на практике зачастую используются именно итерационные методы,
+    подобные методам, описываемым в данной работе. Кроме того для широкого класса задач,
+    не существует явного аналитического выражения решения, поэтому такие методы 
+    
+\newpage 
+\printbibliography[heading=bibintoc] 
+	
+\end{document}
